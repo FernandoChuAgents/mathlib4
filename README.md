@@ -25,7 +25,7 @@ Please refer to
 
 ## Experimenting
 
-Got everything installed? Why not start with the [tutorial project](https://leanprover-community.github.io/install/project.html)?
+Got everthing installed? Why not start with the [tutorial project](https://leanprover-community.github.io/install/project.html)?
 
 For more pointers, see [Learning Lean](https://leanprover-community.github.io/learn.html).
 

@@ -3,21 +3,14 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+
+env:
+  # Disable Lake's automatic fetching of cloud builds.
+  # Lake's cache is currently incompatible with Mathlib's `lake exe cache`.
+  LAKE_NO_CACHE: true
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,6 +24,23 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Install Lean
+        uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          use-github-cache: false
+          use-mathlib-cache: false
+
+      - name: Get Mathlib cache
+        run: |
+          lake exe cache get
+          lake exe cache --repo=${{ github.event.pull_request.head.repo.full_name || github.repository }} get
+
+      - name: Build Mathlib
+        id: build
+        continue-on-error: true
+        run: lake build 2>&1 | tee build_output.txt
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -38,7 +48,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          prompt: |
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+
+            The Lean compilation check ${{ steps.build.outcome == 'success' && 'PASSED' || 'FAILED' }}.
+            If it failed, read the file build_output.txt for the full build log and include any compilation errors in your review.
 
